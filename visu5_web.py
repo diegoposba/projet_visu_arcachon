@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-Version web de visu5 — Panel + Bokeh image_rgba.
-
 Lancement : panel serve visu5_web.py --show
 
 Interactions :
@@ -36,8 +34,8 @@ pn.extension('matplotlib', raw_css=[
     '.bk-panel-models-pane-Matplotlib img { width: 100% !important; height: auto !important; display: block; }',
 ])
 
-# ── Numba (optionnel) ─────────────────────────────────────────────────────────
-# Les fonctions JIT sont dans _numba_kernels.py (nom de module stable)
+# ── Numba ─────────────────────────────────────────────────────────
+# Les fonctions JIT sont dans _numba_kernels.py
 # afin que le cache Numba reste valide entre les redémarrages de Panel.
 import sys, importlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -164,7 +162,7 @@ class Visu5Engine:
         # ── 7. Cache vecteur ─────────────────────────────────────
         self._roads_proj    = None
         self._hmax_proj     = None
-        self._communes_proj = None   # liste de (col_full, row_mpl, name)
+        self._communes_proj = None
 
         # ── 8. Calcul initial ────────────────────────────────────
         self._recompute()
@@ -266,7 +264,7 @@ class Visu5Engine:
         cols          = col_idx.astype(float)
         cols[out]     = np.nan
         row_disp[out] = np.nan
-        return cols, row_disp   # coords en espace composite (y=0 en haut comme mpl)
+        return cols, row_disp
 
     # ── Cache de projection vecteur ───────────────────────────────────────────
 
@@ -307,7 +305,7 @@ class Visu5Engine:
         self._communes_proj = list(zip(cols.tolist(), rows.tolist(),
                                        self._commune_names.tolist()))
 
-    # ── Construction des géométries vecteur (fenêtre courante) ────────────────
+    # ── Construction des géométries vecteur ────────────────
 
     def _build_segments_windowed(self, vs):
         """Retourne liste de (xs, ys) en coordonnées image-mpl (y=0 en haut)."""
@@ -486,7 +484,7 @@ class Visu5Engine:
             return f"Aperçu → centre ({self.a}, {self.b}). {msg}"
 
         elif yg > (self.hs - HR):
-            # Clic bandeau J → ajuste R0 (recalcul partiel)
+            # Clic bandeau J → ajuste R0
             p_col_disp = int(np.clip(round(xg), 1, WT)) - 1
             p_col_full = (self.view_start + p_col_disp) % WT_FULL
             q_row      = int(np.clip(round(yg - (self.hs - HR)), 1, HR)) - 1
@@ -508,13 +506,13 @@ class Visu5Engine:
                           min(WT_FULL, int(global_xg + WT_FULL) + sig_cols + 1)),
             ]) % WT_FULL)
             msg = self._recompute(cols_changed=affected)
-            # R0 a changé → row_disp des vecteurs change → re-projection complète
+            # R0 a changé → re-projection complète
             self._project_vectors_full()
             self._project_communes_full()
             return f"Bandeau J. {msg}"
 
         else:
-            # Clic vue polaire → rotation (fast path np.roll)
+            # Clic sur la vue polaire → rotation
             global_xg = self.view_start + xg
             d  = 2 * np.pi * global_xg / WT_FULL
             dd = int(max(1, min(WT_FULL, round(WT_FULL * d / (2 * np.pi)))))
@@ -525,7 +523,7 @@ class Visu5Engine:
             self.J_full = np.roll(self.J_full, -dd, axis=1)
             self.u_x    = np.roll(self.u_x,    -dd, axis=1)
             self.u_y    = np.roll(self.u_y,    -dd, axis=1)
-            # Mise à jour rapide du cache vecteur : décaler cols de -dd (equiv. roll)
+            # Mise à jour rapide du cache vecteur 
             new_roads = []
             for cols_full, rows in self._roads_proj:
                 nc = cols_full.copy()
@@ -560,13 +558,10 @@ print("Données chargées. Démarrage du serveur Panel…")
 
 # ── Dimensions d'affichage ────────────────────────────────────────────────────
 _comp0    = engine._make_composite(0)
-IMG_H, IMG_W = _comp0.shape[:2]       # (hs, WT + ws)
+IMG_H, IMG_W = _comp0.shape[:2]
 HIST_H = 130
 
 # ── Conversion de coordonnées ─────────────────────────────────────────────────
-# Bokeh y=0 en bas, mpl y=0 en haut → après flipud de l'image :
-#   mpl_row r  ↔  bokeh_y = IMG_H - 1 - r
-# Tap: bokeh_y by → mpl_y = IMG_H - 1 - by  ≈  IMG_H - by
 
 def _mpl_to_bokeh_ys(ys_mpl):
     """Transforme une liste de listes de rangées mpl → coordonnées Bokeh."""
@@ -582,8 +577,8 @@ img_source = ColumnDataSource(dict(
     x=[0], y=[0], dw=[IMG_W], dh=[IMG_H],
 ))
 
-# ── Histogramme matplotlib → PNG base64 dans un pn.pane.HTML ──────────────────
-# L'image est rendue avec width:100% inline → suit exactement le flex container.
+# ── Histogramme matplotlib ──────────────────
+
 fig_hist, ax_hist = plt.subplots(1, 1, figsize=(10, 1.6))
 fig_hist.subplots_adjust(left=0.06, right=0.99, top=0.85, bottom=0.12)
 
@@ -619,7 +614,7 @@ hmax_source = ColumnDataSource(dict(
     colors=_vc0,
 ))
 
-# ── Secteur de vue (minimap) — même logique que visu5.py _update_sector ───────
+# ── Minimap ───────
 _ws = engine.ws
 
 def _compute_sector():
@@ -719,8 +714,6 @@ p_map.add_layout(cardinal_labels)
 p_map.axis.visible = False
 p_map.grid.visible = False
 
-# ── Figure histogramme ────────────────────────────────────────────────────────
-
 # ── Légende bivariée ──────────────────────────────────────────────────────────
 _H_ROWS  = [('Hmax &lt;0.5 m',   [1, 2, 3, 4]),
              ('Hmax 0.5–1.5 m', [5, 6, 7, 8]),
@@ -812,7 +805,7 @@ def _update_cardinals():
         x_bk = col_full - vs
         if 10 <= x_bk <= WT - 10:
             xs.append(x_bk)
-            ys.append(IMG_H - 25)   # haut de l'image (Bokeh y=0 en bas)
+            ys.append(IMG_H - 25)   # haut de l'image
             texts.append(label)
     cardinal_source.data = dict(x=xs, y=ys, text=texts)
 
@@ -851,17 +844,12 @@ commune_source.data = dict(x=_cx0, y=_cy0, text=_ct0)
 _update_cardinals()
 
 # ── Layout Panel ──────────────────────────────────────────────────────────────
-# Ratio WT:ws = 1200:675 = 16:9 → flex 16:9 aligne exactement l'histogramme
-# sur la portion carte déformée de p_map (WT colonnes), et le panneau droit
-# sur la minimap (ws colonnes).
-# subplots_adjust : left=0.06, right=0.99  → zone des barres = 93 % de la figure
-# On veut : (figure_flex / (figure_flex + ws)) × 0.93 = WT / IMG_W
-# → figure_flex = ws × WT / (IMG_W × 0.93 − WT)
+
 _left_adj   = 0.06
 _right_adj  = 0.99
-_plot_frac  = _right_adj - _left_adj          # 0.93
+_plot_frac  = _right_adj - _left_adj         
 _flex_hist  = round(engine.ws * WT / (IMG_W * _plot_frac - WT) * 0.90)
-_flex_right = engine.ws    # 675
+_flex_right = engine.ws    
 
 top_row = pn.Row(
     pn.Column(hist_pane, sizing_mode='stretch_width',
@@ -874,8 +862,6 @@ top_row = pn.Row(
     sizing_mode='stretch_width',
     margin=(0, 0, 0, 0),
 )
-# padding-left de la carte = même blanc que la marge gauche matplotlib
-# = left_adj × (flex_hist / flex_total) × 100 %
 _flex_total   = _flex_hist + _flex_right
 _map_pad_left = f'{_left_adj * _flex_hist / _flex_total * 100:.2f}%'
 
