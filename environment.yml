@@ -1,0 +1,13 @@
+name: visu_arcachon
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10
+  - numpy
+  - pillow
+  - matplotlib
+  - geopandas
+  - panel
+  - bokeh
+  - numba           # optionnel — accélère _lookup() de 10-30×
